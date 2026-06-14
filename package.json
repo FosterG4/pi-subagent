@@ -1,0 +1,47 @@
+{
+  "name": "@fosterg4/pi-subagent",
+  "version": "1.0.0",
+  "description": "Delegate tasks to specialized subagents with isolated context windows, structured JSON handoff, contract schemas, and live TUI streaming",
+  "keywords": [
+    "pi-package",
+    "pi-subagent",
+    "subagent",
+    "agent",
+    "ai"
+  ],
+  "license": "MIT",
+  "author": "fosterg4",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fosterg4/pi-subagent.git"
+  },
+  "homepage": "https://github.com/fosterg4/pi-subagent#readme",
+  "bugs": {
+    "url": "https://github.com/fosterg4/pi-subagent/issues"
+  },
+  "files": [
+    "*.ts",
+    "agents/*.md",
+    "prompts/*.md"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": "^0.79.3",
+    "@earendil-works/pi-ai": "^0.79.3",
+    "@earendil-works/pi-coding-agent": "^0.79.3",
+    "@earendil-works/pi-tui": "^0.79.3",
+    "typebox": "^1.2.10"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "scripts": {
+    "test": "npx tsx tests/run.ts",
+    "test:validate": "npx tsx -e \"import { runValidateTests } from './tests/validate.test.ts'; runValidateTests();\"",
+    "test:agents": "npx tsx -e \"import { runAgentsTests } from './tests/agents.test.ts'; runAgentsTests();\""
+  }
+}
