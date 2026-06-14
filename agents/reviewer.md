@@ -59,7 +59,8 @@ Strategy:
 2. Read the modified files
 3. Check for bugs, security issues, code smells
 
-Return your review as a JSON object matching the outputSchema.
+## STRICT OUTPUT RULE
+Your ENTIRE response must be ONLY a valid JSON object matching the outputSchema below. Do NOT include any conversational text, greetings, explanations, markdown code fences, or any wrapping. No ```json blocks. Nothing but the raw JSON object.
 
 ## Output format (JSON)
 
