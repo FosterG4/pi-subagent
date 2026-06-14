@@ -35,12 +35,15 @@ import {
 	formatAgentList,
 } from "./agents.ts";
 import { type ValidationResult, validateSchema } from "./validate.ts";
+import { fmt, usageLine, sumUsage } from "./utils.ts";
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
 const PER_TASK_OUTPUT_CAP = 50 * 1024;
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
+interface UsageStats {
 	input: number;
 	output: number;
 	cacheRead: number;
@@ -954,11 +957,13 @@ export default function (pi: ExtensionAPI) {
 				return theme.fg("error", "\u2717");
 			};
 
-			// --- Single mode ---
+		// --- Single mode ---
 			if (details.mode === "single" && details.results.length === 1) {
 				const r = details.results[0];
 				const status = getStatusText(r);
 				const finalOutput = getFinalOutputText(r.messages);
+				const usage = usageLine(r.usage);
+				const usg = usage ? theme.fg("dim", usage) : "";
 
 				if (expanded) {
 					const container = new Container();
@@ -968,6 +973,10 @@ export default function (pi: ExtensionAPI) {
 					if (finalOutput) {
 						container.addChild(new Spacer(1));
 						container.addChild(new Markdown(finalOutput.trim(), 0, 0, mdTheme));
+					}
+					if (usg) {
+						container.addChild(new Spacer(1));
+						container.addChild(new Text(usg, 0, 0));
 					}
 					return container;
 				}
@@ -981,6 +990,7 @@ export default function (pi: ExtensionAPI) {
 				} else {
 					text += `\n${theme.fg("muted", "(no output)")}`;
 				}
+				if (usg) text += `\n${usg}`;
 				return new Text(text, 0, 0);
 			}
 
@@ -991,6 +1001,8 @@ export default function (pi: ExtensionAPI) {
 				const allOk = details.results.every((r) => r.exitCode === 0);
 				const icon = allOk ? theme.fg("success", "\u2713") : theme.fg("error", "\u2717");
 				const steps = details.results.map((r) => r.agent).join(" \u2192 ");
+				const total = sumUsage(details.results);
+				const totalUsg = usageLine(total);
 
 				if (expanded) {
 					const container = new Container();
@@ -999,17 +1011,18 @@ export default function (pi: ExtensionAPI) {
 					);
 					for (const r of details.results) {
 						const out = getFinalOutputText(r.messages);
+						const stepUsage = usageLine(r.usage);
+						const stepUsg = stepUsage ? theme.fg("dim", stepUsage) : "";
+						const label = `${getStatusText(r)} ${theme.fg("accent", r.agent)}${r.model ? theme.fg("muted", ` \u00B7 ${r.model}`) : ""}${stepUsg ? "  " + stepUsg : ""}`;
 						if (out) {
 							container.addChild(new Spacer(1));
-							container.addChild(
-								new Text(
-									`${getStatusText(r)} ${theme.fg("accent", r.agent)}${r.model ? theme.fg("muted", ` \u00B7 ${r.model}`) : ""}`,
-									0,
-									0,
-								),
-							);
+							container.addChild(new Text(label, 0, 0));
 							container.addChild(new Markdown(out.trim(), 0, 0, mdTheme));
 						}
+					}
+					if (totalUsg && details.results.length > 1) {
+						container.addChild(new Spacer(1));
+						container.addChild(new Text(totalUsg, 0, 0));
 					}
 					return container;
 				}
@@ -1023,6 +1036,7 @@ export default function (pi: ExtensionAPI) {
 				} else {
 					text += `\n${theme.fg("muted", "(no output)")}`;
 				}
+				if (totalUsg) text += `\n${totalUsg}`;
 				return new Text(text, 0, 0);
 			}
 
@@ -1039,6 +1053,8 @@ export default function (pi: ExtensionAPI) {
 
 				if (expanded && running === 0) {
 					const container = new Container();
+					const total = sumUsage(details.results);
+					const totalUsg = usageLine(total);
 					container.addChild(
 						new Text(
 							`${icon} ${theme.fg("accent", `${done} tasks`)}`,
@@ -1048,11 +1064,13 @@ export default function (pi: ExtensionAPI) {
 					);
 					for (const r of details.results) {
 						const out = getFinalOutputText(r.messages);
+						const stepUsage = usageLine(r.usage);
+						const stepUsg = stepUsage ? theme.fg("dim", stepUsage) : "";
 						if (out) {
 							container.addChild(new Spacer(1));
 							container.addChild(
 								new Text(
-									`${getStatusText(r)} ${theme.fg("accent", r.agent)}`,
+									`${getStatusText(r)} ${theme.fg("accent", r.agent)}${stepUsg ? "  " + stepUsg : ""}`,
 									0,
 									0,
 								),
@@ -1060,11 +1078,19 @@ export default function (pi: ExtensionAPI) {
 							container.addChild(new Markdown(out.trim(), 0, 0, mdTheme));
 						}
 					}
+					if (totalUsg && details.results.length > 1) {
+						container.addChild(new Spacer(1));
+						container.addChild(new Text(totalUsg, 0, 0));
+					}
 					return container;
 				}
 
+				const usg = usageLine(sumUsage(details.results));
 				let text = `${icon} ${theme.fg("accent", `${done}/${details.results.length} tasks`)}`;
-				if (running === 0 && !expanded) text += theme.fg("muted", " (Ctrl+O to expand)");
+				if (running === 0) {
+					if (usg) text += `\n${usg}`;
+					if (!expanded) text += theme.fg("muted", " (Ctrl+O to expand)");
+				}
 				return new Text(text, 0, 0);
 			}
 

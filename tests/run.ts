@@ -7,6 +7,7 @@
 
 import { runValidateTests } from "./validate.test.ts";
 import { runAgentsTests } from "./agents.test.ts";
+import { runUtilsTests } from "./utils.test.ts";
 
 async function main() {
 	console.log("🧪 @fosterg4/pi-subagent tests\n");
@@ -23,6 +24,7 @@ async function main() {
 	const testSuites: TestSuite[] = [
 		{ name: "validate.ts", fn: runValidateTests },
 		{ name: "agents.ts", fn: runAgentsTests },
+		{ name: "utils.ts", fn: runUtilsTests },
 	];
 
 	for (const suite of testSuites) {
