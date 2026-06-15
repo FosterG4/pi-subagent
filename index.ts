@@ -650,7 +650,8 @@ export default function (pi: ExtensionAPI) {
 
 				const closeWidget = () => {
 					if (widgetTimer) { clearInterval(widgetTimer); widgetTimer = undefined; }
-					if (widgetHandle) { widgetHandle.close(); widgetHandle = undefined; }
+					try { (widgetHandle as any)?.close?.(); } catch { /* ignore */ }
+					widgetHandle = undefined;
 					widgetRef = undefined;
 				};
 
