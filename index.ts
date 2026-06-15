@@ -36,6 +36,7 @@ import {
 } from "./agents.ts";
 import { type ValidationResult, validateSchema } from "./validate.ts";
 import { fmt, usageLine, sumUsage } from "./utils.ts";
+import { AgentWidget, type WidgetEntry } from "./ui.ts";
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
@@ -236,6 +237,7 @@ async function runSingleAgent(
 	signal: AbortSignal | undefined,
 	onUpdate: OnUpdateCallback | undefined,
 	makeDetails: (results: SingleResult[]) => SubagentDetails,
+	onStats?: (stats: { turns: number; tokens: number }) => void,
 ): Promise<SingleResult> {
 	const agent = agents.find((a) => a.name === agentName);
 
@@ -373,6 +375,8 @@ async function runSingleAgent(
 							currentResult.usage.cost += usage.cost?.total || 0;
 							currentResult.usage.contextTokens = usage.totalTokens || 0;
 						}
+						const total = currentResult.usage.input + currentResult.usage.output + currentResult.usage.cacheRead;
+						onStats?.({ turns: currentResult.usage.turns, tokens: total });
 						if (!currentResult.model && msg.model)
 							currentResult.model = msg.model;
 						if (msg.stopReason) currentResult.stopReason = msg.stopReason;
@@ -640,8 +644,18 @@ export default function (pi: ExtensionAPI) {
 			if (params.chain && params.chain.length > 0) {
 				const results: SingleResult[] = [];
 				let previousStructured: Record<string, unknown> | undefined;
+				let widgetHandle: ReturnType<typeof pi.ui.custom> | undefined;
+
+				const closeWidget = () => {
+					if (widgetHandle) {
+						widgetHandle.close();
+						widgetHandle = undefined;
+					}
+				};
 
 				for (let i = 0; i < params.chain.length; i++) {
+					closeWidget();
+
 					const step = params.chain[i];
 					let taskWithContext = step.task;
 
@@ -651,12 +665,25 @@ export default function (pi: ExtensionAPI) {
 							/\{previous\}/g,
 							JSON.stringify(previousStructured, null, 2),
 						);
-					} else {
+					} else if (i > 0) {
 						taskWithContext = taskWithContext.replace(
 							/\{previous\}/g,
 							getFinalOutput(results[i - 1]?.messages ?? ""),
 						);
 					}
+
+					// Spawn live widget for this step
+					if (ctx.hasUI) {
+						const widget = new AgentWidget();
+						widget.addAgent(step.agent, step.task.replace(/\{[^}]+\}/g, "").trim());
+						widgetHandle = ctx.ui.custom(widget, { overlay: true });
+					}
+
+					const stepStats = (stats: { turns: number; tokens: number }) => {
+						if (widgetHandle) {
+							widgetHandle.requestRender();
+						}
+					};
 
 					const chainUpdate: OnUpdateCallback | undefined = onUpdate
 						? (partial) => {
@@ -681,6 +708,7 @@ export default function (pi: ExtensionAPI) {
 						signal,
 						chainUpdate,
 						makeDetails("chain"),
+						stepStats,
 					);
 					results.push(result);
 
@@ -697,6 +725,7 @@ export default function (pi: ExtensionAPI) {
 					}
 
 					if (isFailedResult(result)) {
+						closeWidget();
 						const errorMsg = getResultOutput(result);
 						return {
 							content: [
@@ -710,6 +739,8 @@ export default function (pi: ExtensionAPI) {
 						};
 					}
 				}
+
+				closeWidget();
 
 				const lastResult = results[results.length - 1];
 				return {
