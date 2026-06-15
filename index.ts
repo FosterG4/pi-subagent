@@ -645,13 +645,12 @@ export default function (pi: ExtensionAPI) {
 				const results: SingleResult[] = [];
 				let previousStructured: Record<string, unknown> | undefined;
 				let widgetHandle: ReturnType<typeof pi.ui.custom> | undefined;
+				let widgetRef: AgentWidget | undefined;
+				let widgetTimer: ReturnType<typeof setInterval> | undefined;
 
 				const closeWidget = () => {
 					if (widgetTimer) { clearInterval(widgetTimer); widgetTimer = undefined; }
-					if (widgetHandle) {
-						widgetHandle.close();
-						widgetHandle = undefined;
-					}
+					if (widgetHandle) { widgetHandle.close(); widgetHandle = undefined; }
 					widgetRef = undefined;
 				};
 
@@ -675,8 +674,6 @@ export default function (pi: ExtensionAPI) {
 					}
 
 					// Spawn live widget for this step
-					let widgetRef: AgentWidget | undefined;
-					let widgetTimer: ReturnType<typeof setInterval> | undefined;
 					if (ctx.hasUI) {
 						widgetRef = new AgentWidget();
 						widgetRef.addAgent(step.agent, step.task.replace(/\{[^}]+\}/g, "").trim());

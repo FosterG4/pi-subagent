@@ -1,6 +1,6 @@
 {
   "name": "@fosterg4/pi-subagent",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Delegate tasks to specialized subagents with isolated context windows, structured JSON handoff, contract schemas, and live TUI streaming",
   "keywords": [
     "pi-package",
