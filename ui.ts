@@ -12,7 +12,6 @@
  *   handle.close();
  */
 
-import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { fmt } from "./utils.ts";
 
 // ---------------------------------------------------------------------------
@@ -71,8 +70,6 @@ export class AgentWidget {
 	private entries: WidgetEntry[] = [];
 	private frame = 0;
 	private startTimes: Map<string, number> = new Map();
-	private cachedWidth?: number;
-	private cachedLines?: string[];
 
 	addAgent(name: string, task: string): void {
 		const exists = this.entries.find((e) => e.name === name);
@@ -93,7 +90,6 @@ export class AgentWidget {
 		const entry = this.entries.find((e) => e.name === name);
 		if (!entry) return;
 		Object.assign(entry, update);
-		entry.elapsedMs = Date.now() - (this.startTimes.get(name) ?? Date.now());
 		this.invalidate();
 	}
 
@@ -107,70 +103,72 @@ export class AgentWidget {
 		return this.entries.find((e) => e.name === name);
 	}
 
+	markDone(name: string): void {
+		const entry = this.entries.find((e) => e.name === name);
+		if (entry) { entry.status = "done"; }
+		this.invalidate();
+	}
+
 	invalidate(): void {
-		this.cachedWidth = undefined;
-		this.cachedLines = undefined;
+		// No cache to invalidate — render() is always fresh
+	}
+
+	private entryLine(entry: WidgetEntry, width: number): string[] {
+		const lines: string[] = [];
+		const now = Date.now();
+		const elapsedMs = entry.elapsedMs || (now - (this.startTimes.get(entry.name) ?? now));
+
+		const icon = statusIcon(entry.status, this.frame);
+		const parts: string[] = [];
+
+		// Always show icon + name
+		let line = `\u00A0${icon} ${entry.name}`;
+
+		// Turns
+		parts.push(entry.turns > 0 ? `↻${entry.turns}` : "↻0");
+
+		// Tokens
+		if (entry.tokens > 0) {
+			const tokStr = fmt(entry.tokens);
+			parts.push(`${tokStr} token`);
+			if (entry.contextUsagePct !== undefined && entry.contextUsagePct > 0) {
+				parts.push(`(${entry.contextUsagePct}%)`);
+			}
+		}
+
+		// Time
+		if (elapsedMs > 99) parts.push(formatTime(elapsedMs));
+		else parts.push("0.0s");
+
+		// Model
+		if (entry.model) parts.push(entry.model);
+
+		line += ` · ${parts.join(" · ")}`;
+		if (line.length > width) line = line.slice(0, width - 3) + "…";
+		lines.push(line);
+
+		// Activity sub-line (running agents only)
+		if (entry.task && entry.status === "running") {
+			const preview = entry.task.length > 60 ? `${entry.task.slice(0, 57)}…` : entry.task;
+			lines.push(`  ⎿  ${preview}`);
+		}
+
+		return lines;
 	}
 
 	render(width: number): string[] {
-		if (this.cachedLines && this.cachedWidth === width) {
-			return this.cachedLines;
-		}
-
 		const lines: string[] = [];
 
-		if (this.entries.length === 0) {
-			this.cachedWidth = width;
-			this.cachedLines = [];
-			return [];
-		}
+		if (this.entries.length === 0) return [];
 
 		// Header
-		lines.push("● Agents");
+		lines.push("\u25CF Agents");
 
 		for (const entry of this.entries) {
-			const icon = statusIcon(entry.status, this.frame);
-			const parts: string[] = [];
-
-			// Turns
-			if (entry.turns > 0) parts.push(`↻${entry.turns}`);
-
-			// Tokens
-			if (entry.tokens > 0) {
-				const tokStr = fmt(entry.tokens);
-				parts.push(`${tokStr} token`);
-				if (entry.contextUsagePct !== undefined && entry.contextUsagePct > 0) {
-					parts.push(`(${entry.contextUsagePct}%)`);
-				}
-			}
-
-			// Time
-			if (entry.elapsedMs > 0) parts.push(formatTime(entry.elapsedMs));
-
-			// Model
-			if (entry.model) parts.push(entry.model);
-
-			const stats = parts.length > 0 ? ` · ${parts.join(" · ")}` : "";
-
-			let line = ` ${icon} ${entry.name}${stats}`;
-			if (line.length > width) {
-				line = line.slice(0, width - 1) + "…";
-			}
-			lines.push(line);
-
-			// Activity sub-line
-			if (entry.task && entry.status === "running") {
-				const preview =
-					entry.task.length > 60
-						? `${entry.task.slice(0, 57)}…`
-						: entry.task;
-				lines.push(`  ⎿  ${preview}`);
-			}
+			lines.push(...this.entryLine(entry, width));
 		}
 
 		this.frame++;
-		this.cachedWidth = width;
-		this.cachedLines = lines;
 		return lines;
 	}
 }

@@ -647,10 +647,12 @@ export default function (pi: ExtensionAPI) {
 				let widgetHandle: ReturnType<typeof pi.ui.custom> | undefined;
 
 				const closeWidget = () => {
+					if (widgetTimer) { clearInterval(widgetTimer); widgetTimer = undefined; }
 					if (widgetHandle) {
 						widgetHandle.close();
 						widgetHandle = undefined;
 					}
+					widgetRef = undefined;
 				};
 
 				for (let i = 0; i < params.chain.length; i++) {
@@ -674,16 +676,21 @@ export default function (pi: ExtensionAPI) {
 
 					// Spawn live widget for this step
 					let widgetRef: AgentWidget | undefined;
+					let widgetTimer: ReturnType<typeof setInterval> | undefined;
 					if (ctx.hasUI) {
 						widgetRef = new AgentWidget();
 						widgetRef.addAgent(step.agent, step.task.replace(/\{[^}]+\}/g, "").trim());
-						widgetHandle = ctx.ui.custom(() => widgetRef!, { overlay: true });
+						widgetHandle = ctx.ui.custom(
+							(_tui, _theme, _kb, done) => {
+								widgetTimer = setInterval(() => widgetRef?.invalidate(), 200);
+								return widgetRef!;
+							},
+							{ overlay: true },
+						);
 					}
 
 					const stepStats = (stats: { turns: number; tokens: number }) => {
-						if (widgetHandle) {
-							widgetHandle.requestRender();
-						}
+						widgetRef?.invalidate();
 					};
 
 					const chainUpdate: OnUpdateCallback | undefined = onUpdate
