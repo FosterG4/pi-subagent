@@ -36,7 +36,6 @@ import {
 } from "./agents.ts";
 import { type ValidationResult, validateSchema } from "./validate.ts";
 import { fmt, usageLine, sumUsage } from "./utils.ts";
-import { AgentWidget, type WidgetEntry } from "./ui.ts";
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
@@ -644,20 +643,8 @@ export default function (pi: ExtensionAPI) {
 			if (params.chain && params.chain.length > 0) {
 				const results: SingleResult[] = [];
 				let previousStructured: Record<string, unknown> | undefined;
-				let widgetHandle: ReturnType<typeof pi.ui.custom> | undefined;
-				let widgetRef: AgentWidget | undefined;
-				let widgetTimer: ReturnType<typeof setInterval> | undefined;
-
-				const closeWidget = () => {
-					if (widgetTimer) { clearInterval(widgetTimer); widgetTimer = undefined; }
-					try { (widgetHandle as any)?.close?.(); } catch { /* ignore */ }
-					widgetHandle = undefined;
-					widgetRef = undefined;
-				};
 
 				for (let i = 0; i < params.chain.length; i++) {
-					closeWidget();
-
 					const step = params.chain[i];
 					let taskWithContext = step.task;
 
@@ -673,23 +660,6 @@ export default function (pi: ExtensionAPI) {
 							getFinalOutput(results[i - 1]?.messages ?? ""),
 						);
 					}
-
-					// Spawn live widget for this step
-					if (ctx.hasUI) {
-						widgetRef = new AgentWidget();
-						widgetRef.addAgent(step.agent, step.task.replace(/\{[^}]+\}/g, "").trim());
-						widgetHandle = ctx.ui.custom(
-							(_tui, _theme, _kb, done) => {
-								widgetTimer = setInterval(() => widgetRef?.invalidate(), 200);
-								return widgetRef!;
-							},
-							{ overlay: true },
-						);
-					}
-
-					const stepStats = (stats: { turns: number; tokens: number }) => {
-						widgetRef?.invalidate();
-					};
 
 					const chainUpdate: OnUpdateCallback | undefined = onUpdate
 						? (partial) => {
@@ -714,7 +684,6 @@ export default function (pi: ExtensionAPI) {
 						signal,
 						chainUpdate,
 						makeDetails("chain"),
-						stepStats,
 					);
 					results.push(result);
 
@@ -731,7 +700,6 @@ export default function (pi: ExtensionAPI) {
 					}
 
 					if (isFailedResult(result)) {
-						closeWidget();
 						const errorMsg = getResultOutput(result);
 						return {
 							content: [
@@ -746,7 +714,6 @@ export default function (pi: ExtensionAPI) {
 					}
 				}
 
-				closeWidget();
 
 				const lastResult = results[results.length - 1];
 				return {
