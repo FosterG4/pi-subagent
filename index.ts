@@ -673,10 +673,11 @@ export default function (pi: ExtensionAPI) {
 					}
 
 					// Spawn live widget for this step
+					let widgetRef: AgentWidget | undefined;
 					if (ctx.hasUI) {
-						const widget = new AgentWidget();
-						widget.addAgent(step.agent, step.task.replace(/\{[^}]+\}/g, "").trim());
-						widgetHandle = ctx.ui.custom(widget, { overlay: true });
+						widgetRef = new AgentWidget();
+						widgetRef.addAgent(step.agent, step.task.replace(/\{[^}]+\}/g, "").trim());
+						widgetHandle = ctx.ui.custom(() => widgetRef!, { overlay: true });
 					}
 
 					const stepStats = (stats: { turns: number; tokens: number }) => {
